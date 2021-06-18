@@ -133,7 +133,7 @@ void SimBuffers::MapBuffers()
 	uvs.map();
 	uvsGpu.map();
 
-	//contacts
+	// contacts
 	contactPlanes.map();
 	contactVelocities.map();
 	contactIndices.map();
@@ -239,23 +239,17 @@ void SimBuffers::InitBuffers()
 FlexSystem::FlexSystem()
 {	
 	g_profile = false;
-	
 	nEmitter = 0;
 	nVolumeBoxes = 0;
-
 	maxParticles = 9;
 	g_maxDiffuseParticles = 60;
 	numDiffuse = 64;
-
-	g_solver = NULL;
-
-	memset(&g_timers, 0, sizeof(g_timers));
-
+	g_solver = nullptr;
 	cursor = 0;
-
 	nFields = 0;
 	clothMesh0 = nullptr;
 	g_triangleCollisionMesh = nullptr;
+	memset(&g_timers, 0, sizeof(g_timers));
 }
 
 FlexSystem::~FlexSystem()
@@ -285,8 +279,7 @@ void FlexSystem::getSimTimers()
 	else 
 	{
 		simLatency = NvFlexGetDeviceLatency(g_solver, &g_GpuTimers.computeBegin, &g_GpuTimers.computeEnd, &g_GpuTimers.computeFreq);
-	}
-		
+	}	
 }
 
 void FlexSystem::initSystem() 
@@ -490,12 +483,12 @@ void FlexSystem::postInitScene()
 	g_buffers->anisotropy2.resize(maxParticles);
 	g_buffers->anisotropy3.resize(maxParticles);
 
-	// Diffuse
+	// diffuse
 	g_buffers->diffusePositions.resize(g_maxDiffuseParticles);
 	g_buffers->diffuseVelocities.resize(g_maxDiffuseParticles);
 	g_buffers->diffuseCount.resize(g_maxDiffuseParticles);
 
-	// Triangles
+	// triangles
 	g_buffers->triangles.resize(maxParticles);
 	g_buffers->trianglesGpu.resize(maxParticles);
 	g_buffers->triangleNormals.resize(maxParticles);
@@ -503,14 +496,14 @@ void FlexSystem::postInitScene()
 	g_buffers->uvs.resize(maxParticles);
 	g_buffers->uvsGpu.resize(maxParticles);
 
-	// Contacts
+	// contacts
 	const int maxContactsPerParticle = 6;
 	g_buffers->contactPlanes.resize(maxParticles * maxContactsPerParticle);
 	g_buffers->contactVelocities.resize(maxParticles * maxContactsPerParticle);
 	g_buffers->contactIndices.resize(maxParticles);
 	g_buffers->contactCounts.resize(maxParticles);
 
-	// Rest positions
+	// rest positions
 	g_buffers->restPositions.resize(g_buffers->positions.size());
 	for (size_t j = 0; j < g_buffers->positions.size(); ++j)
 	{
@@ -694,8 +687,9 @@ void FlexSystem::initTriangleMesh(const OP_Inputs* inputs) {
 
 void FlexSystem::initClothMesh(const OP_Inputs* inputs) {
 	const OP_SOPInput* sopInput = inputs->getParSOP("Flexcloth0");
+	const OP_CHOPInput* instInput = inputs->getParCHOP("Instanceschop");
 
-	if (sopInput && sopInput->getNumPrimitives() > 0)
+	if ((sopInput != nullptr) && (sopInput->getNumPrimitives() > 0))
 	{
 		std::vector<Vec4> m_positions;
 		std::vector<int> m_indices;
@@ -703,7 +697,7 @@ void FlexSystem::initClothMesh(const OP_Inputs* inputs) {
 		const TexCoord* textures = nullptr;
 		int32_t numTextures = 0;
 
-		if (clothMesh0) 
+		if (clothMesh0 != nullptr) 
 		{
 			delete clothMesh0;
 		}
@@ -719,63 +713,92 @@ void FlexSystem::initClothMesh(const OP_Inputs* inputs) {
 			numTextures = sopInput->getTextures()->numTextureLayers;
 		}
 
-		for (int i = 0; i < sopInput->getNumPoints(); i++) 
+		if ((instInput != nullptr) && (instInput->numChannels == 9))
 		{
-			Position curPos = sopInput->getPointPositions()[i];
+			float tx, ty, tz;
+			float rx, ry, rz;
+			float sx, sy, sz;
 
-			m_positions.push_back(Vec4(curPos.x, curPos.y, curPos.z, 0.0));
+			for (int i = 0; i < instInput->numSamples; i++)
+			{
+				tx = instInput->getChannelData(0)[i];
+				ty = instInput->getChannelData(1)[i];
+				tz = instInput->getChannelData(2)[i];
+				rx = instInput->getChannelData(3)[i];
+				ry = instInput->getChannelData(4)[i];
+				rz = instInput->getChannelData(5)[i];
+				sx = instInput->getChannelData(6)[i];
+				sy = instInput->getChannelData(7)[i];
+				sz = instInput->getChannelData(8)[i];
 
-			g_buffers->positions.push_back(Vec4(curPos.x, curPos.y, curPos.z, 1.0f));
-			g_buffers->velocities.push_back(Vec3(0.0f, 0.0f, 0.0f));
-			g_buffers->phases.push_back(NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseSelfCollideFilter));
-			if (norms) g_buffers->normals.push_back(Vec4(norms[i].x, norms[i].y, norms[i].z, 0.0f));
-			if (textures) g_buffers->uvs.push_back(Vec3(textures[i].u, textures[i].v, textures[i].w));
+			}
+		}
+		else
+		{
+			// Particle positions
+			for (int i = 0; i < sopInput->getNumPoints(); i++)
+			{
+				Position curPos = sopInput->getPointPositions()[i];
+
+				m_positions.push_back(Vec4(curPos.x, curPos.y, curPos.z, 0.0));
+
+				g_buffers->positions.push_back(Vec4(curPos.x, curPos.y, curPos.z, 1.0f));
+				g_buffers->velocities.push_back(Vec3(0.0f, 0.0f, 0.0f));
+				g_buffers->phases.push_back(NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseSelfCollideFilter));
+				if (norms) g_buffers->normals.push_back(Vec4(norms[i].x, norms[i].y, norms[i].z, 0.0f));
+				if (textures) g_buffers->uvs.push_back(Vec3(textures[i].u, textures[i].v, textures[i].w));
+			}
+
+			int baseIndex = 0;
+
+			// Triangle indices
+			for (int i = 0; i < sopInput->getNumPrimitives(); i++)
+			{
+				SOP_PrimitiveInfo curPrim = sopInput->getPrimitive(i);
+				m_indices.push_back(curPrim.pointIndices[2]);
+				m_indices.push_back(curPrim.pointIndices[1]);
+				m_indices.push_back(curPrim.pointIndices[0]);
+			}
+
+			int triOffset = g_buffers->triangles.size();
+			int triCount = m_indices.size() / 3;
+
+			g_buffers->triangles.assign((int*)&m_indices[0], m_indices.size());
+
+			float stretchStiffness = (float)inputs->getParDouble("Strechcloth");
+			float bendStiffness = (float)inputs->getParDouble("Bendcloth");
+
+			clothMesh0 = new ClothMesh(&m_positions[0], m_positions.size(), &m_indices[0], m_indices.size(), stretchStiffness, bendStiffness, true);
+
+			const int numSprings = int(clothMesh0->mConstraintCoefficients.size());
+
+			g_buffers->springIndices.resize(numSprings * 2);
+			g_buffers->springLengths.resize(numSprings);
+			g_buffers->springStiffness.resize(numSprings);
+
+			// Spring constraints
+			for (int i = 0; i < numSprings; ++i)
+			{
+				g_buffers->springIndices[i * 2 + 0] = clothMesh0->mConstraintIndices[i * 2 + 0];
+				g_buffers->springIndices[i * 2 + 1] = clothMesh0->mConstraintIndices[i * 2 + 1];
+				g_buffers->springLengths[i] = clothMesh0->mConstraintRestLengths[i];
+				g_buffers->springStiffness[i] = clothMesh0->mConstraintCoefficients[i];
+			}
+
+			float pressure = inputs->getParDouble("Pressure");
+
+			// Inflatable constraints (optional)
+			if (pressure > 0.0f)
+			{
+				g_buffers->inflatableTriOffsets.push_back(triOffset / 3);
+				g_buffers->inflatableTriCounts.push_back(triCount);
+				g_buffers->inflatablePressures.push_back(pressure);
+				g_buffers->inflatableVolumes.push_back(clothMesh0->mRestVolume);
+				g_buffers->inflatableCoefficients.push_back(clothMesh0->mConstraintScale);
+			}
 		}
 
-		int baseIndex = 0;
-
-		for (int i = 0; i < sopInput->getNumPrimitives(); i++)
-		{
-			SOP_PrimitiveInfo curPrim = sopInput->getPrimitive(i);
-			m_indices.push_back(curPrim.pointIndices[2]);
-			m_indices.push_back(curPrim.pointIndices[1]);
-			m_indices.push_back(curPrim.pointIndices[0]);
-		}
-
-		int triOffset = g_buffers->triangles.size();
-		int triCount = m_indices.size() / 3;
-
-		g_buffers->triangles.assign((int*)&m_indices[0], m_indices.size());
-
-		float stretchStiffness = (float)inputs->getParDouble("Strechcloth");
-		float bendStiffness = (float)inputs->getParDouble("Bendcloth");
-
-		clothMesh0 = new ClothMesh(&m_positions[0], m_positions.size(), &m_indices[0], m_indices.size(), stretchStiffness, bendStiffness, true);
-
-		const int numSprings = int(clothMesh0->mConstraintCoefficients.size());
-
-		g_buffers->springIndices.resize(numSprings * 2);
-		g_buffers->springLengths.resize(numSprings);
-		g_buffers->springStiffness.resize(numSprings);
-
-		for (int i = 0; i < numSprings; ++i)
-		{
-			g_buffers->springIndices[i * 2 + 0] = clothMesh0->mConstraintIndices[i * 2 + 0];
-			g_buffers->springIndices[i * 2 + 1] = clothMesh0->mConstraintIndices[i * 2 + 1];
-			g_buffers->springLengths[i] = clothMesh0->mConstraintRestLengths[i];
-			g_buffers->springStiffness[i] = clothMesh0->mConstraintCoefficients[i];
-		}
-
-		float pressure = inputs->getParDouble("Pressure");
-
-		if (pressure > 0.0f)
-		{
-			g_buffers->inflatableTriOffsets.push_back(triOffset / 3);
-			g_buffers->inflatableTriCounts.push_back(triCount);
-			g_buffers->inflatablePressures.push_back(pressure);
-			g_buffers->inflatableVolumes.push_back(clothMesh0->mRestVolume);
-			g_buffers->inflatableCoefficients.push_back(clothMesh0->mConstraintScale);
-		}
+		
 	}
 }
 
@@ -1129,8 +1152,8 @@ void FlexSystem::ClearShapes()
 	g_buffers->shapeFlags.resize(0);
 }
 
-void FlexSystem::setShapes(){
-
+void FlexSystem::setShapes()
+{
 	if(g_buffers->shapeFlags.size())
 	{
 		NvFlexSetShapes(
@@ -1186,9 +1209,7 @@ void FlexSystem::update()
 	}
 
 	setShapes();
-
 	NvFlexSetParams(g_solver, &g_params);
-
 	NvFlexUpdateSolver(g_solver, g_dt, g_numSubsteps, g_profile);
 
 	if (g_buffers->positions.size())

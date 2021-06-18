@@ -63,7 +63,7 @@ ClothTOP::ClothTOP(const OP_NodeInfo* info, TOP_Context* context)
 {
 	myExecuteCount = 0;
 
-	std::cout << "Init FlexSystem." << std::endl;
+	std::cout << "[CLT] INIT" << std::endl;
 	FlexSys = &FlexSys->getInstance();
 	FlexSys->initSystem();
 
@@ -108,13 +108,13 @@ void ClothTOP::execute(TOP_OutputFormatSpecs* outputFormat,
 
 	if (reset == 1) 
 	{
-		std::cout << "FlexSystem: Reset scene." << std::endl;
+		std::cout << "[CLT] RESET" << std::endl;
+
 		FlexSys->initScene();
 		FlexSys->initClothMesh(inputs);
 		FlexSys->initTriangleMesh(inputs);
 
-		// Radial force field
-		if (inputs->getParCHOP("Forceschop") &&  (FlexSys->forcefieldRadial!=nullptr))
+		if (inputs->getParCHOP("Forceschop") && (FlexSys->forcefieldRadial != nullptr))
 		{
 			delete FlexSys->forcefieldRadial;
 		}
@@ -225,6 +225,7 @@ void ClothTOP::execute(TOP_OutputFormatSpecs* outputFormat,
 	if (reset == 1) 
 	{
 		FlexSys->postInitScene();
+		//FlexSys->update();
 
 		FlexSys->g_buffers->uvs.map();
 		FlexSys->g_buffers->uvsGpu.map();
@@ -256,7 +257,6 @@ void ClothTOP::pulsePressed(const char* name, void* reserved1)
 		
 	}
 }
-
 
 int32_t ClothTOP::getNumInfoCHOPChans(void *reserved1)
 {
@@ -768,6 +768,17 @@ void ClothTOP::setupParamsCollisions(OP_ParameterManager* manager) {
 }
 
 void ClothTOP::setupParamsCloths(OP_ParameterManager* manager) {
+	//// Instance transforms
+	//{
+	//	OP_StringParameter sp;
+
+	//	sp.name = "Instanceschop";
+	//	sp.label = "Instance Transforms CHOP";
+	//	sp.page = "Cloths";
+
+	//	OP_ParAppendResult res = manager->appendCHOP(sp);
+	//	assert(res == OP_ParAppendResult::Success);
+	//}
 	//Cloth mesh
 	{
 		OP_StringParameter sp;
