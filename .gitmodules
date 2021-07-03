@@ -1,0 +1,3 @@
+[submodule "ToxLibrary"]
+	path = ToxLibrary
+	url = https://github.com/vininja/ToxLibrary.git
